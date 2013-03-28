@@ -93,7 +93,6 @@ class wing(object):
         #スパン位置
         y = [(self.span / 2.0) *np.cos((i + 1) * (np.pi / 2.0) / (self.halfStep)) for i in range(self.halfStep)]
 
-#        self.ypositionDeg = [np.degrees((i + 1) * (np.pi / 2.0) / (self.halfStep)) for i in range(self.halfStep)]
         #コード長の配列 cosθ基準
         chordArray2 = []
         for yy in y:
@@ -127,7 +126,6 @@ class wing(object):
     def calc_chord(self,lambda1,lambda2,y1,y2,Cr,yy):
         return lambda1 * Cr -(yy - y1) * (lambda1 - lambda2) / (y2 - y1) * Cr
 
-    # --- calc the chord array according to slices << --
 
     # Analyzes the wing object
     # -----------------------------------------------
@@ -136,9 +134,6 @@ class wing(object):
     # angle      - angle of flight
     # -----------------------------------------------
     #
-    # If you want to analyze sample.csv wing data by 100 steps, try
-    # targetWing = wing('sample.csv', 100)
-    # targetWing.analyze(10, 30, 5)
     #
     def calc_reynolds(self, velocity, temperature):
     # ----------- >> calc Reynolds array ------------------
@@ -227,39 +222,31 @@ class wing(object):
     def calc_CD0Array(self):
         from scipy.interpolate import interp1d
         datas = [self.calc_Interpolate(i) for i in testWing.Re/10**6.]
-        #cd0Array = [self.calc_Interpolate(i)[round(self.angle+10)][2] for i in self.Re / 10 ** 6.0]
         localangle = [self.angle - i for i in np.degrees(self.inducedAoa)]
         self.localangle = localangle #吹き下ろしを弾いた後の迎角配列
         cd0Array = []
         for i in range(len(self.Re)):
-            #print localangle[i]
             #datas[i].transpose() #[0]と[2]でinterpolateする。
             linear_interp = interp1d(datas[i].transpose()[0], datas[i].transpose()[2])
-            #localcd0 = linear_interp(localangle[i])
             cd0Array.append(float(linear_interp(localangle[i])))
-##        ax = cd0Array
-##        cd0Array = [self.calc_Interpolate(self.Re[i] / 10 ** 6.0)[round(self.angle+10)][2] for i in range(len(self.Re))]
-##        bx = cd0Array
-##        pl.plot(self.chordArray2,ax)
-##        pl.plot(self.chordArray2,bx)
-##        pl.show()
         self.cd0Array = cd0Array
 
+    #Calculate center of pressure
     def calc_xcp(self):
         from scipy.interpolate import interp1d
         datas = [self.calc_Interpolate(i) for i in testWing.Re/10**6.]
-        #self.localangle
+
         xcpArray = []
         for i in range(len(self.Re)):
             linear_interp = interp1d(datas[i].transpose()[0], datas[i].transpose()[9])
             xcpArray.append(float(linear_interp(self.localangle[i])))
-        #print xcpArray
+
         self.xcpArray = xcpArray
         self.chordcpArray = xcpArray * self.chordArray2
-        print self.chordcpArray,xcpArray,self.chordArray2
-        pl.plot(self.yy,self.chordArray2)
-        pl.plot(self.yy,self.chordcpArray)
-        pl.show()
+##        print self.chordcpArray,xcpArray,self.chordArray2
+##        pl.plot(self.yy,self.chordArray2)
+##        pl.plot(self.yy,self.chordcpArray)
+##        pl.show()
 
 
 
@@ -279,8 +266,8 @@ class wing(object):
         self.inducedAoa = inducedAoa
 
     # --------------- calc CD << ------------------
-    # --------------------
-    # oddOReven (1 by default) - n sequence is 0:even 1:odd
+
+
     # --------------------
     def calc_CL_Cdi_CD(self, angle, oddOReven = 1):
         self.angle = angle
@@ -291,7 +278,7 @@ class wing(object):
         # μの計算。
         # self.liftSlopeArray[i] -> 5.5 で航空力学の基礎第2版 p.147の計算になる
         u = [self.liftSlopeArray[i] * self.chordArray2[i] / 4.0 / self.span for i in range(len(self.chordArray2))]
-        #u = [5.5 * self.chordArray2[i] / 4.0 / self.span for i in range(len(self.chordArray2))]
+
 
 
 
@@ -305,8 +292,7 @@ class wing(object):
         for theta in thetas:
             tmp = []
             for n in range(1, self.halfStep * 2, oddOReven+1):
-                #バグ修正 by shunyo
-                # n * u[n] + np.sin(theta)* np.sin(n*theta) -> (n * u[i] + np.sin(theta))* np.sin(n*theta)
+
                 tmp.append((n * u[i] + np.sin(theta)) * np.sin(n*theta))
             righthand = u[i] * np.sin(theta)
             lmatrix.append(tmp / righthand)
@@ -314,8 +300,6 @@ class wing(object):
             #これを入れると航空力学の基礎p.147の連立方程式が再現できる
             #print tmp / righthand
 
-            #バグ修正 by shunyo
-            # (i+1)/2 -> 2 * i + 1
 
             # 絶対迎角
             # absoluteAlpha = 1.0で航空力学の基礎第2版 p.147の計算になる
@@ -328,7 +312,7 @@ class wing(object):
         #連立方程式を行列を使って解く
         An = solve(np.array(lmatrix), np.array(rmatrix))
         #これをいれると航空力学の基礎p.147のAnの値がでる
-        #print An
+
 
 
         # calc CL
@@ -337,39 +321,18 @@ class wing(object):
         # calc Cdi
         sigma = 0
 
-        #バグ修正 by shunyo
-        # i*An[i] -> j*An[i]　航空力学の基礎第2版 p.147 式3.122の下の式より3からはじめる
-        # self.analyzeStep/(self.oddOReven+1)-1 -> self.analyzeStep/(self.oddOReven+1) 最後まで足さないといけない
+
+        #航空力学の基礎第2版 p.147 式3.122の下の式より3からはじめる
+
         j = 3
         for i in range(self.oddOReven, self.halfStep):
             sigma += j * An[i] ** 2.0 / An[0] ** 2.0
             j += 2
 
-
-        #バグ修正 by shunyo 航空力学の基礎第2版 p.142 式3.103より
-        # sigma -> (1.0 + sigma)
         self.Cdi = (1.0 + sigma)*self.CL**2.0/np.pi/self.aspect
 
 
-##        # calc CD
-##        self.calc_CD0Array()
-##        dCD = 0
-##        j = 0
-##        #dyは有次元の計算幅
-##        #dy = 1.0/self.analyzeStep *(self.span/2.0)
-##        for i in self.chordArray2[:-1]:
-##            upperbase = i
-##            #最後のところだけ上底=下底にする
-##            if j + 1 == len(self.chordArray2):
-##                lowerbase = i
-##            #最後以外は次のコード長を使う
-##            else:
-##                lowerbase = self.chordArray2[j + 1]
-##            dy = self.span / 2.0 * (np.cos(np.pi / 2.0 / (len(self.chordArray2)*2) * (j + 1)) - np.cos(np.pi / 2.0 /(len(self.chordArray2)*2) * (j + 2) ))
-##            dCD += (upperbase + lowerbase) * dy / 2.0 * self.cd0Array[j]
-##            j += 1
-##        dCD = dCD / (self.surface / 2.0)
-##        print dCD
+
 
         #donw washと誘導迎角の計算
         self.calc_downwash(thetas,An)
@@ -391,8 +354,7 @@ class wing(object):
 
         #風圧中心の計算
         self.calc_xcp()
-        #print dCD
-#        print 2.0 / self.surface * sum(deltaD)
+
 
 
 
@@ -415,32 +377,14 @@ class wing(object):
         self.circDist = circDist
         self.clDist = clDist
 
-        #長さ[m]あたりの揚力[N]
-        #print len(clDist),len(self.chordArray2)
+
         dL = 0.5 * self.airDensity * self.velocity **2.0 * self.chordArray2 * clDist
 
         self.dL = dL
 
-        #print newangle
-        #print np.degrees(self.inducedAoa)
-
-##        pl.figure(figsize = (15,8))
-##        pltfigure(self.yy,dL,1,"dL")
-##        pltfigure(self.yy,clDist,2,"cl")
-##        pltfigure(self.yy,self.dwArray,3,"downwash")
-##        pltfigure(self.figyy,self.figxx,4,"shape")
-##        pl.show()
 
 
 
-##        pl.clf()
-##        pl.plot(thetas,clDist,label ="cl")
-##        pl.plot(thetas,circDist,label = "Gamma")
-##        #pl.plot(thetas,dL,label = "dL")
-##        pl.legend()
-##        pl.show()
-        #もう一度考える
-        #print 2*sum(dL)/9.8,"[kgf]"
 
         #吹き下ろしの計算
         #print "---dw---",self.dwArray
@@ -450,9 +394,7 @@ class wing(object):
         return self.CL, self.Cdi, self.CD
 
     #揚力の計算：単位はNで出る
-    #バグ修正 by shunyo
-    # self.velocity -> self.velocity**2.0
-    # self.dihedral -> np.radians(self.dihedral)
+
     def calc_L(self):
         self.L = 0.5*self.airDensity*self.velocity**2.0*self.surface*self.CL*np.cos(np.radians(self.dihedral))
 
@@ -560,7 +502,7 @@ class tail(object):
 if __name__ == '__main__':
     # 4分割で航空力学の基礎第2版 p.147の計算になる
     # wing('kokurikgaku_p.147.csv',4)
-    testWing = wing('Book1.csv',40)
+    testWing = wing('testplane.csv',40)
     testWing.calc_reynolds(9, 30)
 
 ##    testWing.calc_withconstWeight()
@@ -600,8 +542,5 @@ if __name__ == '__main__':
     RequiredPower = testBody.framePower + testBody.fairringPower + testWing.W + testTail.htailPower + testTail.vtailPower
     print "Required Power = %0.3f[W]" % RequiredPower
 
-    #pl.clf()
-##    pl.figure(figsize = (10.9,2.5))
-##    pl.plot(testWing.figyy,testWing.figxx)
-##    pl.axis("equal")
-##    pl.show()
+
+
