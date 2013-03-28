@@ -1,0 +1,12 @@
+(ID),(Comment),(Option1),(Option2)
+test,() parameters are not required at this moment.,,
+
+Wing configuration,,,
+Surface [m2],Aspect ratio,(Dihedral angle [deg]),XFOIL directory
+20,20,10,FX76-MP120,DAE31,#76-140_XFLR5
+
+Wing shape configuration,,,
+"Y position [%] (from center to edge, center is 0, edge is 100)","Chord [%] (Normalized value, chord length at center (Y=0) is 100%",(Sweepback angle),
+0,100,,
+50,100,,
+100,50,,
