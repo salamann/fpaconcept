@@ -12,12 +12,12 @@ Objective of these scripts is to conduct conceputual design of human powered air
 
 Requirements
 ------------
-*Necessary Installation
-**Python 2.5 or higher of 2.x
-**Scipy
-**Numpy
-**Matplotlib
+* Necessary Installation
+** Python 2.5 or higher of 2.x
+** Scipy
+** Numpy
+** Matplotlib
 
-*Necessary to calculate
-**aerodynamics data for two dimensional airfoil
-**aircraft planform data
+* Necessary to calculate
+** Aerodynamics data for two dimensional airfoil
+** Aircraft planform data
