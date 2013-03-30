@@ -260,7 +260,7 @@ class wing(object):
             dwArray.append(dw)
         self.dwArray = dwArray
 
-    #ラジアンで出てくる
+    """calculation induced alpha [radians]"""
     def calc_inducedAoa(self):
         inducedAoa = np.array(self.dwArray) / self.velocity
         self.inducedAoa = inducedAoa
@@ -268,7 +268,7 @@ class wing(object):
     # --------------- calc CD << ------------------
 
 
-    # --------------------
+    """calculation induced drag"""
     def calc_CL_Cdi_CD(self, angle, oddOReven = 1):
         self.angle = angle
         self.oddOReven = oddOReven
@@ -277,6 +277,7 @@ class wing(object):
 
         # μの計算。
         # self.liftSlopeArray[i] -> 5.5 で航空力学の基礎第2版 p.147の計算になる
+        self.calc_liftSlopeArray()
         u = [self.liftSlopeArray[i] * self.chordArray2[i] / 4.0 / self.span for i in range(len(self.chordArray2))]
 
 
@@ -302,6 +303,7 @@ class wing(object):
 
 
             # 絶対迎角
+            self.calc_zeroliftangleArray()
             # absoluteAlpha = 1.0で航空力学の基礎第2版 p.147の計算になる
             absoluteAlpha = np.radians(self.angle) - self.zeroliftangleArray[i]
             #absoluteAlpha = 1.0
@@ -338,7 +340,7 @@ class wing(object):
         self.calc_downwash(thetas,An)
         self.calc_inducedAoa()
         #new angleは吹き下ろしを考慮した迎角
-        newangle = self.angle - np.degrees(self.inducedAoa)
+##        newangle = self.angle - np.degrees(self.inducedAoa)
 
         self.calc_CD0Array()
         #CD0の計算
@@ -354,9 +356,6 @@ class wing(object):
 
         #風圧中心の計算
         self.calc_xcp()
-
-
-
 
         #スパン方向の揚力係数・循環・揚力計算
         circDist = []
@@ -382,84 +381,102 @@ class wing(object):
 
         self.dL = dL
 
-
-
-
-
         #吹き下ろしの計算
         #print "---dw---",self.dwArray
         #誘導抵抗以外の抵抗：CD0
         self.CD0 = dCD
         self.CD = dCD + self.Cdi
-        return self.CL, self.Cdi, self.CD
+##        return self.CL, self.Cdi, self.CD
 
     #揚力の計算：単位はNで出る
 
-    def calc_L(self):
+##    def calc_L(self):
         self.L = 0.5*self.airDensity*self.velocity**2.0*self.surface*self.CL*np.cos(np.radians(self.dihedral))
+        self.L = self.L / 9.80665
 
     #抵抗の計算：単位はNで出る
-    def calc_D(self):
+##    def calc_D(self):
         self.D = 0.5*self.airDensity*self.velocity**2.0*self.surface*self.CD
 
     #ワット数の計算：単位はｗ
-    def calc_W(self):
+##    def calc_W(self):
         self.W = self.D * self.velocity
 
 
-
-    def calc_XFOIL(self):
-        import os
-        import time
-        pwd = os.getcwd()
-        pwd = pwd+'\\xfoil6.96\\bin'
-        os.chdir(pwd)
-        cmd = 'xfoil.exe'
-
-        print 'done.'
-        time.sleep(2)
-
-    def calc_all(self, angle, Reynolds):
-        self.calc_liftSlope(Reynolds)
-        self.calc_zeroLiftAngle()
-        self.calc_CL_Cdi_CD(angle)
+##
+##    def calc_XFOIL(self):
+##        import os
+##        import time
+##        pwd = os.getcwd()
+##        pwd = pwd+'\\xfoil6.96\\bin'
+##        os.chdir(pwd)
+##        cmd = 'xfoil.exe'
+##
+##        print 'done.'
+##        time.sleep(2)
+##
+##    def calc_all(self, angle, Reynolds):
+##        self.calc_liftSlope(Reynolds)
+##        self.calc_zeroLiftAngle()
+##        self.calc_CL_Cdi_CD(angle)
 
     #翼面積、速度、重量が与えられたときのCLを計算するための関数
     def solve_CL(self,angle):
-        testWing.calc_reynolds(self.velocity, self.temperature)
-        testWing.calc_liftSlopeArray()
-        testWing.calc_zeroliftangleArray()
-        testWing.calc_CL_Cdi_CD(angle)
+        self.calc_reynolds(self.velocity, self.temperature)
+        self.calc_liftSlopeArray()
+        self.calc_zeroliftangleArray()
+        self.calc_CL_Cdi_CD(angle)
 
         Cw = self.weight*9.81 / (0.5 * self.airDensity * self.velocity ** 2.0 *self.surface)
-        print Cw,self.CL
+##        print Cw,self.CL
         return Cw - self.CL * np.cos(np.radians(self.dihedral))
 
     def calc_weight(self,weight):
         self.weight = weight
 
-    def calc_withconstWeight(self):
-        self.calc_weight(100)
+    def calc_withconstWeight(self,objweight,velocity,temperature):
+        self.calc_reynolds(velocity, temperature)
+        self.calc_weight(objweight)
         from scipy import optimize
-        optimize.brenth(self.solve_CL,-10,10)
-        print "CL = %0.3f" % self.CL
-        print "CD0 = %0.4f" % self.CD0
-        print "CDi = %0.4f" % self.Cdi
-        print "CD = %0.4f" % self.CD
-        self.calc_L()
-        self.calc_D()
-        self.calc_W()
-        L = self.L/9.8
-        print "Lift = %0.3f[kgf]" % L
-        print "WingDrag = %0.3f[N]" % self.D
-        print "WingPower = %0.3f[W]" % self.W
-        print "---"
 
-    # --------------- calc parasite CD << ------------------
-    # --------------------
-    # --------------------
-    #
-    #
+        optimize.brenth(self.solve_CL,-5,10)
+
+        L = self.L/9.81
+
+
+    """csvfile, number of cell, design cruise speed, ambient temperature"""
+    def calc_variedaoa(self,velocity,temperature,aoaarray):
+        #testWing = wing(wingcsv,ncell)
+        testWing.calc_reynolds(velocity, temperature)
+        testWing.calc_liftSlopeArray()
+        testWing.calc_zeroliftangleArray()
+
+        """機体の特性を出す"""
+        CLarray = []
+        CDarray = []
+        for i in aoaarray:
+            testWing.calc_CL_Cdi_CD(i)
+            CLarray.append(self.CL)
+            CDarray.append(self.CD)
+
+        self.CLarray = CLarray
+        self.CDarray = CDarray
+
+        """maxL/Dの線を引くためのリスト生成"""
+        j = 0
+        for i in np.array(CLarray)/np.array(CDarray):
+            if i == max(np.array(CLarray)/np.array(CDarray)):
+                maxslope = i
+            j += 1
+        self.maxslope = maxslope
+
+        xlist = list(CDarray)
+        ylist = list(np.array(testWing.CDarray)*testWing.maxslope)
+        xlist.insert(0,0)
+        ylist.insert(0,0)
+        self.xmaxLDline =xlist
+        self.ymaxLDline =ylist
+
 class body(object):
     def __init__(self,velocity,temperature):
         self.temperature = temperature
@@ -502,23 +519,47 @@ class tail(object):
 if __name__ == '__main__':
     # 4分割で航空力学の基礎第2版 p.147の計算になる
     # wing('kokurikgaku_p.147.csv',4)
-    testWing = wing('testplane.csv',40)
-    testWing.calc_reynolds(9, 30)
+##    testWing = wing('testplane.csv',40)
+##    testWing.calc_reynolds(9, 30)
+    ncell = 40
+    velocity = 9
+    temperature = 30
+    aoaarray = range(-3,7)
+    testWing = wing('testplane.csv',ncell)
 
-##    testWing.calc_withconstWeight()
+    testWing.calc_withconstWeight(100,velocity,temperature)
+    pl.plot(testWing.CD,testWing.CL,'o')
 
-    testWing.calc_liftSlopeArray()
-    testWing.calc_zeroliftangleArray()
-    testWing.calc_CL_Cdi_CD(3)
+    testWing.calc_variedaoa(velocity,temperature,aoaarray)
+    pl.plot(testWing.CDarray,testWing.CLarray)
+    pl.plot(testWing.xmaxLDline,testWing.ymaxLDline)
+    pl.xlim(xmin=0)
+    pl.ylim(ymin=0)
+    pl.xlabel("CD")
+    pl.ylabel("CL")
+    pl.legend(("Design Cruise Point","Polar Curve","maxL/D line"))
+    pl.savefig("PolarCurbe.png")
+
+    pl.clf()
+    pl.plot(aoaarray,testWing.CDarray)
+    pl.savefig("alpha-CD,png")
+
+    pl.clf()
+    pl.plot(aoaarray,testWing.CLarray)
+    pl.savefig("alpha-CL,png")
+
+
+
+
 
     print "CL = %0.3f" % testWing.CL
     print "CD0 = %0.4f" % testWing.CD0
     print "CDi = %0.4f" % testWing.Cdi
     print "CD = %0.4f" % testWing.CD
-    testWing.calc_L()
-    testWing.calc_D()
-    testWing.calc_W()
-    L = testWing.L/9.8
+##    testWing.calc_L()
+##    testWing.calc_D()
+##    testWing.calc_W()
+##    L = testWing.L/9.8
     print "Lift = %0.3f[kgf]" % L
     print "WingDrag = %0.3f[N]" % testWing.D
     print "WingPower = %0.3f[W]" % testWing.W
