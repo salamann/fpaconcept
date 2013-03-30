@@ -14,8 +14,6 @@ from scipy.linalg import solve
 #
 # filename - filepath and filename
 #
-
-#tameshini
 def readcsv(filename):
     import csv
     data = []
@@ -47,12 +45,12 @@ def readdata(filename):
     data = np.array(data,dtype=float)
     return data
 
-def pltfigure(x,y,nn,nlabel):
-    pl.subplot(410 + nn )
-    pl.plot(x,y,label = nlabel)
-    pl.ioff()
-    pl.legend()
-    pl.draw()
+##def pltfigure(x,y,nn,nlabel):
+##    pl.subplot(410 + nn )
+##    pl.plot(x,y,label = nlabel)
+##    pl.ioff()
+##    pl.legend()
+##    pl.savefig()
 
 
 # Load wing configuration file and create "wing" instance
@@ -72,6 +70,12 @@ class wing(object):
         self.dihedral = data[5][2]
         self.XFOILdirectory = str(data[5][3])
         self.shapeData = data[9:]
+        import os
+        self.dirname = str(self.XFOILdirectory) + "S" + str(self.surface) + "AR" + str(self.aspect)
+        try:
+            os.mkdir(self.dirname)
+        except:
+            pass
 
     # --- >> calc the chord array according to slices --
         #スパン長の計算
@@ -120,13 +124,58 @@ class wing(object):
         self.figxx = figxx
         self.figyy = figyy
 
-
+        self.calc_wingthickness()
 
     #コード長を求めるメソッド
     #lambda1:一つ前のテーパ比,lambda2:1つ後のテーパ比,y1:一つ前のスパン,y2:1つ後のスパン
     #Cr:ルートコード長、yy:求めるスパン長
     def calc_chord(self,lambda1,lambda2,y1,y2,Cr,yy):
         return lambda1 * Cr -(yy - y1) * (lambda1 - lambda2) / (y2 - y1) * Cr
+
+    def calc_wingthickness(self):
+        """calculation wing thickness list"""
+        from scipy.interpolate import interp1d
+
+        #open airfoil data
+        data = open2read(self.XFOILdirectory + "/" + "foil.dat")
+
+        #make airfoil list
+        xlist = [float(i.split()[0]) for i in data[1:]]
+        ylist = [float(i.split()[1]) for i in data[1:]]
+
+        #divide upper and lower
+        for i in range(len(xlist)):
+            if xlist[i] == ylist[i]:
+                zeropoint = i
+        upperx = np.array(xlist[:zeropoint+1])[::-1]
+        uppery = np.array(ylist[:zeropoint+1])[::-1]
+
+        lowerx = np.array(xlist[zeropoint:])
+        lowery = np.array(ylist[zeropoint:])
+
+        #interpolate uppwer and lower file in order to be able to different yposition of both upper and lower
+        linear_interp_upper = interp1d(upperx,uppery)
+        linear_interp_lower = interp1d(lowerx,lowery)
+##
+        xx = np.linspace(0.,1.,100)
+        newylower = linear_interp_lower(xx)
+        newyupper = linear_interp_upper(xx)
+
+        thickness = newyupper - newylower
+        maxthickness = max(thickness)
+
+        #make thickness list of span direction
+        self.thickness = [i * maxthickness for i in self.chordArray2]
+
+        pl.plot(self.yy,self.thickness)
+        pl.savefig(self.dirname + "/" +"thickness")
+
+##        print maxthickness
+##        pl.plot(xx,thickness)
+##        pl.savefig("thickness")
+
+
+
 
 
     # Analyzes the wing object
@@ -372,7 +421,8 @@ class wing(object):
         #誘導抵抗以外の抵抗：CD0
         self.CD0 = dCD
         self.CD = dCD + self.Cdi
-##        return self.CL, self.Cdi, self.CD
+
+
 
     #揚力の計算：単位はNで出る
 
@@ -414,7 +464,7 @@ class wing(object):
         self.calc_CL_Cdi_CD(angle)
 
         Cw = self.weight*9.81 / (0.5 * self.airDensity * self.velocity ** 2.0 *self.surface)
-##        print Cw,self.CL
+        print "solving CL of constant weight..."
         return Cw - self.CL * np.cos(np.radians(self.dihedral))
 
     def calc_weight(self,weight):
@@ -464,25 +514,51 @@ class wing(object):
         self.xmaxLDline =xlist
         self.ymaxLDline =ylist
 
+    """calculation of planform data for drawing planform"""
+
     def calc_planform(self):
-        y1 = []
-        x1 = []
-        y2 = []
-        for i in range(1,len(self.xcpArray)+1):
-            y1.append(self.chordArray2[len(self.xcpArray)-1] * (1.0 - self.xcpArray[len(self.xcpArray)-1]) - self.chordArray2[len(self.xcpArray)-i] * (1.0 - self.xcpArray[len(self.xcpArray)-i]))
-            x1.append(self.yy[len(self.xcpArray)-i])
-            y2.append(self.chordArray2[len(self.xcpArray)-1] * self.xcpArray[len(self.xcpArray)-1] + self.chordArray2[len(self.xcpArray)-i] * self.xcpArray[len(self.xcpArray)-i])
-        print y1
-        print x1
+        y1 = [self.chordArray2[len(self.xcpArray)-1] * (1.0 - self.xcpArray[len(self.xcpArray)-1]) - self.chordArray2[len(self.xcpArray)-i] * (1.0 - self.xcpArray[len(self.xcpArray)-i]) for i in range(1,len(self.xcpArray)+1)]
+        x1 = [self.yy[len(self.xcpArray)-i] for i in range(1,len(self.xcpArray)+1)]
+        y2 = [self.chordArray2[len(self.xcpArray)-1] * self.xcpArray[len(self.xcpArray)-1] + self.chordArray2[len(self.xcpArray)-i] * self.xcpArray[len(self.xcpArray)-i] for i in range(1,len(self.xcpArray)+1)]
+
         x2 = x1 + x1[::-1]
         y2 = y1 + y2[::-1]
-        pl.figure(figsize=(12,3))
+        pl.figure(figsize=(12,4))
+        self.planx = x2
+        self.plany = y2
         pl.plot(x2,y2)
         xcp0 = self.chordArray2[len(self.xcpArray)-1] * (1.0 - self.xcpArray[len(self.xcpArray)-1])
         pl.plot([0,self.span/2.],[xcp0,xcp0])
         pl.axis("equal")
-        pl.show()
-        pl.clf()
+        pl.xlabel("y [m]")
+        pl.ylabel("x [m]")
+        pl.legend(("planform","pressure center"))
+        pl.savefig(self.dirname + "/" +"testwing")
+#        pl.clf()
+
+    def draw_spandirdata(self):
+    ##        self.calc_planform()
+    ##        return self.CL, self.Cdi, self.CD
+            pl.figure(figsize=(12,10))
+            pl.axis("equal")
+            pl.subplot(511)
+            pl.plot(self.yy,self.dL,label = "dL")
+            pl.legend()
+            pl.subplot(512)
+            pl.plot(self.yy,self.clDist,label = "dCL")
+            pl.legend()
+            pl.subplot(513)
+            pl.plot(self.yy,self.circDist,label = "Gamma")
+            pl.legend()
+            pl.subplot(514)
+            pl.plot(self.yy,self.inducedAoa,label = "Alpha_i")
+            pl.legend()
+            pl.subplot(515)
+            pl.plot(self.planx,self.plany,label = "Planform")
+            pl.legend()
+            pl.xlabel("y [m]")
+            pl.legend()
+            pl.savefig(testWing.dirname + "/" +"span")
 
 class body(object):
     def __init__(self,velocity,temperature):
@@ -536,8 +612,12 @@ if __name__ == '__main__':
 
     testWing.calc_withconstWeight(100,velocity,temperature)
     testWing.calc_planform()
+    testWing.draw_spandirdata()
+
+
+    pl.clf()
+    pl.figure(figsize=(8,8))
     pl.plot(testWing.CD,testWing.CL,'o')
-    """
 
     testWing.calc_variedaoa(velocity,temperature,aoaarray)
     pl.plot(testWing.CDarray,testWing.CLarray)
@@ -547,15 +627,15 @@ if __name__ == '__main__':
     pl.xlabel("CD")
     pl.ylabel("CL")
     pl.legend(("Design Cruise Point","Polar Curve","maxL/D line"))
-    pl.savefig("PolarCurbe.png")
+    pl.savefig(testWing.dirname + "/" +"PolarCurbe.png")
 
     pl.clf()
     pl.plot(aoaarray,testWing.CDarray)
-    pl.savefig("alpha-CD,png")
+    pl.savefig(testWing.dirname + "/" +"alpha-CD.png")
 
     pl.clf()
     pl.plot(aoaarray,testWing.CLarray)
-    pl.savefig("alpha-CL,png")
+    pl.savefig(testWing.dirname + "/" +"alpha-CL.png")
 
 
 
@@ -588,5 +668,5 @@ if __name__ == '__main__':
     RequiredPower = testBody.framePower + testBody.fairringPower + testWing.W + testTail.htailPower + testTail.vtailPower
     print "Required Power = %0.3f[W]" % RequiredPower
 
-    """
+    """ """
 
